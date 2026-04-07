@@ -65,6 +65,7 @@ const DashboardPage = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [isLocationLocked, setIsLocationLocked] = useState(false);
   const [isSharingLocation, setIsSharingLocation] = useState(true);
+  const [showCopiedConfirm, setShowCopiedConfirm] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -196,6 +197,14 @@ const DashboardPage = () => {
     triggerSosAlert({ triggeredBy: user.id });
   };
 
+  const handleCopyCode = () => {
+    if (inviteCode) {
+      navigator.clipboard.writeText(inviteCode);
+      setShowCopiedConfirm(true);
+      setTimeout(() => setShowCopiedConfirm(false), 2000);
+    }
+  };
+
   return (
     <div className={`dashboard-container ${sosActive ? 'sos-mode' : ''}`}>
       {sosActive && (
@@ -276,8 +285,17 @@ const DashboardPage = () => {
               
               {inviteCode && (
                 <div className="directory-invite-box">
-                  <span>Family Code: </span>
-                  <strong>{inviteCode}</strong>
+                  <div className="invite-box-left">
+                    <span>Family Code</span>
+                    <strong>{inviteCode}</strong>
+                  </div>
+                  <button 
+                    onClick={handleCopyCode} 
+                    className={`copy-code-btn ${showCopiedConfirm ? 'copied' : ''}`}
+                    title="Copy Invite Code"
+                  >
+                    {showCopiedConfirm ? '✅' : '📋'}
+                  </button>
                 </div>
               )}
 

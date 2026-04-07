@@ -349,6 +349,38 @@
   align-items: center;
 }
 
+.invite-box-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.copy-code-btn {
+  background: white;
+  border: 1px solid var(--glass-border);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-premium);
+  font-size: 0.9rem;
+}
+
+.copy-code-btn:hover {
+  transform: scale(1.1);
+  background: var(--bg-color);
+  border-color: var(--primary-color);
+}
+
+.copy-code-btn.copied {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: white;
+}
+
 .directory-invite-box span {
   color: var(--text-secondary);
   font-weight: 500;
