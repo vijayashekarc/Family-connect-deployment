@@ -12,7 +12,8 @@ const server = http.createServer(app);
 const allowedOrigins = [
   process.env.VITE_API_URL, 
   'http://localhost:5173', // Vite default local
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'https://family-connect-deployment.vercel.app'
 ].filter(Boolean);
 
 const corsOptions = {
