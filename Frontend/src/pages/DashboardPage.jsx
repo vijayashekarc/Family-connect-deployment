@@ -21,7 +21,7 @@ const createTeardropIcon = (name, color) => {
   });
 };
 
-const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+const COLORS = ['#0ea5e9', '#10b981', '#06b6d4', '#4ade80', '#3b82f6', '#22c55e'];
 
 // Haversine formula to calculate distance in KM
 const getDistance = (lat1, lon1, lat2, lon2) => {
@@ -36,14 +36,14 @@ const getDistance = (lat1, lon1, lat2, lon2) => {
   return (R * c).toFixed(2);
 };
 
-// Component to dynamically update map center to user location on initial load
-const MapUpdater = ({ center }) => {
+// Component to dynamically update map center to user location on initial load or when locked
+const MapUpdater = ({ center, isLocked }) => {
   const map = useMap();
   useEffect(() => {
-    if (center) {
-      map.setView(center, 13);
+    if (center && (isLocked || !map.getCenter().equals(center))) {
+      map.setView(center, isLocked ? 16 : map.getZoom());
     }
-  }, [center]);
+  }, [center, isLocked]);
   return null;
 };
 
@@ -57,6 +57,18 @@ const DashboardPage = () => {
   const [sosMessage, setSosMessage] = useState('');
   
   const socketRef = useRef(null);
+  
+  // Mobile UI States
+  const [activePanel, setActivePanel] = useState('none'); // 'none', 'directory', 'planner'
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isLocationLocked, setIsLocationLocked] = useState(false);
+  const [isSharingLocation, setIsSharingLocation] = useState(true);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Fetch initial family members and locations
   useEffect(() => {
@@ -113,19 +125,21 @@ const DashboardPage = () => {
           const lng = pos.coords.longitude;
           setMyLocation([lat, lng]);
 
-          // Broadcase via Socket.io instantly
-          socketRef.current.emit('updateLocation', {
-            familyGroupId: user.familyGroupId,
-            userId: user.id,
-            coordinates: [lng, lat]
-          });
+          // Broadcast via Socket.io instantly if sharing is enabled
+          if (isSharingLocation) {
+            socketRef.current.emit('updateLocation', {
+              familyGroupId: user.familyGroupId,
+              userId: user.id,
+              coordinates: [lng, lat]
+            });
 
-          // Also save to DB periodically (optional but requested to bypass for SOS, so normal tracking can use DB)
-          fetch(`${API_URL}/api/user/location`, {
-             method: 'PUT',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ userId: user.id, coordinates: [lng, lat] })
-          }).catch(console.error);
+            // Also save to DB periodically
+            fetch(`${API_URL}/api/user/location`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: user.id, coordinates: [lng, lat] })
+            }).catch(console.error);
+          }
         },
         (err) => console.error(err),
         { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
@@ -136,7 +150,7 @@ const DashboardPage = () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
       socketRef.current.disconnect();
     };
-  }, [user.id, user.familyGroupId]);
+  }, [user.id, user.familyGroupId, isSharingLocation]);
 
   const triggerSosAlert = (data) => {
     setSosActive(true);
@@ -191,71 +205,117 @@ const DashboardPage = () => {
       
       <nav className="dashboard-nav">
         <h2>FamilyConnect</h2>
-        {inviteCode && (
+        {(!isMobile && inviteCode) && (
           <div className="invite-code-display">
             Invite Code: <strong>{inviteCode}</strong>
           </div>
         )}
-        <button onClick={logout} className="btn-logout">Logout</button>
+        <div className="nav-actions">
+          {isMobile && (
+            <>
+              <button 
+                className={`btn-nav-mobile ${activePanel === 'directory' ? 'active' : ''}`}
+                onClick={() => setActivePanel(activePanel === 'directory' ? 'none' : 'directory')}
+              >
+                👥
+              </button>
+              <button 
+                className={`btn-nav-mobile ${activePanel === 'planner' ? 'active' : ''}`}
+                onClick={() => setActivePanel(activePanel === 'planner' ? 'none' : 'planner')}
+              >
+                🗺️
+              </button>
+            </>
+          )}
+          <button 
+            className={`btn-location-toggle ${isSharingLocation ? 'active' : ''}`}
+            onClick={() => setIsSharingLocation(!isSharingLocation)}
+            title={isSharingLocation ? "Broadcasting Location" : "Location Hidden"}
+          >
+            {isSharingLocation ? '📡 On' : '👻 Off'}
+          </button>
+          <button onClick={logout} className="btn-logout">Logout</button>
+        </div>
       </nav>
 
       <div className="map-wrapper">
-        <TripPlanner />
+        <button 
+          className={`btn-map-lock ${isLocationLocked ? 'active' : ''}`}
+          onClick={() => setIsLocationLocked(!isLocationLocked)}
+          title={isLocationLocked ? "Unlock View" : "Center & Lock on Me"}
+        >
+          {isLocationLocked ? '🔒' : '🎯'}
+        </button>
+
+        {(!isMobile || activePanel === 'planner') && <TripPlanner />}
         
         {/* Family Directory Sidebar */}
-        <div className="family-directory-panel">
-          <div className="directory-header">
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-               <div>
-                 <h3>📡 Track Everyone</h3>
-                 <p>Live Member Status</p>
-               </div>
-            </div>
-            <button onClick={handleSosClick} className="sos-btn-full mt-2">
-              🚨 SEND EMERGENCY SOS
-            </button>
-          </div>
-          <div className="directory-scroll-content">
-            <div className="directory-list">
-              {familyMembers.map((member, idx) => {
-                const isMe = member._id === user.id;
-                const color = isMe ? '#2563eb' : COLORS[idx % COLORS.length];
-                
-                const memberLoc = locations[member._id];
-                const finalLoc = isMe && myLocation ? myLocation : memberLoc;
-                
-                let distString = 'Unknown';
-                if (isMe) {
-                  distString = '0.00 KM';
-                } else if (myLocation && finalLoc) {
-                  const dist = getDistance(myLocation[0], myLocation[1], finalLoc[0], finalLoc[1]);
-                  distString = dist !== '?' ? `${dist} KM AWAY` : 'Unknown';
-                }
+        {(!isMobile || activePanel === 'directory') && (
+          <div className="family-directory-panel">
+            <div className="directory-header">
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                 <div>
+                   <h3>📡 Track Everyone</h3>
+                   <p>Live Member Status</p>
+                 </div>
+                 {isMobile && (
+                   <button className="panel-close-btn" onClick={() => setActivePanel('none')}>×</button>
+                 )}
+              </div>
+              
+              {inviteCode && (
+                <div className="directory-invite-box">
+                  <span>Family Code: </span>
+                  <strong>{inviteCode}</strong>
+                </div>
+              )}
 
-                return (
-                  <div key={member._id} className="directory-card">
-                    <div className="directory-info">
-                      <div className="directory-avatar" style={{ backgroundColor: color }}>
-                        {member.name.charAt(0).toUpperCase()}
+              <button onClick={handleSosClick} className="sos-btn-full mt-2">
+                🚨 SEND EMERGENCY SOS
+              </button>
+            </div>
+            <div className="directory-scroll-content">
+              <div className="directory-list">
+                {familyMembers.map((member, idx) => {
+                  const isMe = member._id === user.id;
+                  const color = isMe ? '#0284c7' : COLORS[idx % COLORS.length];
+                  
+                  const memberLoc = locations[member._id];
+                  const finalLoc = isMe && myLocation ? myLocation : memberLoc;
+                  
+                  let distString = 'Unknown';
+                  if (isMe) {
+                    distString = '0.00 KM';
+                  } else if (myLocation && finalLoc) {
+                    const dist = getDistance(myLocation[0], myLocation[1], finalLoc[0], finalLoc[1]);
+                    distString = dist !== '?' ? `${dist} KM AWAY` : 'Unknown';
+                  }
+
+                  return (
+                    <div key={member._id} className="directory-card">
+                      <div className="directory-info">
+                        <div className="directory-avatar" style={{ backgroundColor: color }}>
+                          {member.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h4 className="directory-name">{member.name} {isMe && '(You)'}</h4>
+                          <p className={`directory-distance ${isMe ? 'text-primary' : ''}`}>
+                            {distString}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="directory-name">{member.name} {isMe && '(You)'}</h4>
-                        <p className={`directory-distance ${isMe ? 'text-primary' : ''}`}>
-                          {distString}
-                        </p>
-                      </div>
+                      {!isMe && (
+                        <a href={`tel:${member.phone}`} className="directory-call-btn">
+                          📞 Call
+                        </a>
+                      )}
                     </div>
-                    {!isMe && (
-                      <a href={`tel:${member.phone}`} className="directory-call-btn">
-                        📞 Call
-                      </a>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <MapContainer 
           center={myLocation || [0, 0]} 
@@ -268,7 +328,7 @@ const DashboardPage = () => {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           />
-          {myLocation && <MapUpdater center={myLocation} />}
+          {myLocation && <MapUpdater center={myLocation} isLocked={isLocationLocked} />}
           
           {/* Render Members */}
           {familyMembers.map((member, idx) => {
@@ -279,7 +339,7 @@ const DashboardPage = () => {
             const isMe = member._id === user.id;
             // For own user, use high accuracy myLocation state if available
             const finalLoc = isMe && myLocation ? myLocation : memberLoc;
-            const color = isMe ? '#2563eb' : COLORS[idx % COLORS.length];
+            const color = isMe ? '#0284c7' : COLORS[idx % COLORS.length];
 
             return (
               <Marker 
