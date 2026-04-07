@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import TripPlanner from '../components/TripPlanner';
 import 'leaflet/dist/leaflet.css';
 import './DashboardPage.css';
@@ -49,6 +50,7 @@ const MapUpdater = ({ center, isLocked }) => {
 
 const DashboardPage = () => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [familyMembers, setFamilyMembers] = useState([]);
   const [locations, setLocations] = useState({});
   const [myLocation, setMyLocation] = useState(null);
@@ -258,9 +260,18 @@ const DashboardPage = () => {
                    <h3>📡 Track Everyone</h3>
                    <p>Live Member Status</p>
                  </div>
-                 {isMobile && (
-                   <button className="panel-close-btn" onClick={() => setActivePanel('none')}>×</button>
-                 )}
+                 <div style={{display: 'flex', gap: '0.5rem'}}>
+                   <button 
+                     className="theme-toggle-btn" 
+                     onClick={toggleTheme}
+                     title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+                   >
+                     {theme === 'light' ? '🌙' : '☀️'}
+                   </button>
+                   {isMobile && (
+                     <button className="panel-close-btn" onClick={() => setActivePanel('none')}>×</button>
+                   )}
+                 </div>
               </div>
               
               {inviteCode && (
@@ -326,7 +337,7 @@ const DashboardPage = () => {
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            url={`https://{s}.basemaps.cartocdn.com/${theme === 'light' ? 'light_all' : 'dark_all'}/{z}/{x}/{y}{r}.png`}
           />
           {myLocation && <MapUpdater center={myLocation} isLocked={isLocationLocked} />}
           

@@ -20,6 +20,17 @@
   /* Radii */
   --radius-xl: 1.5rem;
   --transition-premium: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-theme: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, backdrop-filter 0.4s ease;
+}
+
+[data-theme="dark"] {
+  --bg-color: #0f172a;           /* Deep Navy */
+  --text-primary: #f8fafc;       /* Off-white */
+  --text-secondary: #94a3b8;     /* Slate */
+  --glass-bg: rgba(15, 23, 42, 0.85); /* Deep Dark Glass */
+  --glass-border: rgba(14, 165, 233, 0.2);
+  --shadow-premium: 0 20px 50px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 30px rgba(14, 165, 233, 0.15);
 }
 
 * {
@@ -33,6 +44,7 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  transition: var(--transition-theme);
   /* Prevent body scroll to keep panels floating */
 }
 
@@ -42,6 +54,7 @@ body {
   position: relative;
   background: var(--bg-color);
   overflow: hidden;
+  transition: var(--transition-theme);
 }
 
 .app-container::before {
@@ -57,6 +70,14 @@ body {
     radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.08) 0%, transparent 50%);
   animation: mesh-float 20s ease-in-out infinite alternate;
   pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+[data-theme="dark"] .app-container::before {
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(14, 165, 233, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.2) 0%, transparent 50%);
 }
 
 @keyframes mesh-float {
@@ -77,7 +98,7 @@ body {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-premium);
-  transition: all var(--transition-premium);
+  transition: all var(--transition-premium), var(--transition-theme);
 }
 
 .card:hover {
